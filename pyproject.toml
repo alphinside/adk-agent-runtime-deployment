@@ -2,23 +2,17 @@
 name = "spending-insights"
 version = "0.1.0"
 requires-python = ">=3.11,<3.14"
-# Below google-adk 2.14.0, google-genai 2.34.0, google-cloud-aiplatform 2.7.0 and
-# google-auth 2.62.1, the sandbox executor gets a 401 inside a deployed agent
-# that runs under Agent Identity.
 dependencies = [
     "google-adk[gcp,otel-gcp,mcp]==2.14.0",
     "google-genai==2.34.0",
     "google-auth==2.62.1",
     "google-cloud-aiplatform[agent-engines]==2.7.0",
     "google-cloud-agentplatform[agent-engines]==2.7.0",
-    # The version the trace content settings were checked against.
     "opentelemetry-instrumentation-google-genai==0.7b1",
     "opentelemetry-resourcedetector-gcp<=1.12.0a0",
     "a2a-sdk[http-server]>=1.0,<2",
     "google-cloud-logging>=3.12.0,<4.0.0",
     "protobuf>=6.31.1,<7.0.0",
-    # UnsafeLocalCodeExecutor runs the model's code with this Python, so the
-    # libraries a chart needs have to be installed here.
     "matplotlib==3.10.7",
     "pandas==2.3.3",
 ]
