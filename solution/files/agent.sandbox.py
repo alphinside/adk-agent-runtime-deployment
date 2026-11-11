@@ -69,7 +69,7 @@ def agent_engine() -> str:
     if not engine:
         raise RuntimeError(
             "No Agent Runtime instance recorded in deployment_metadata.json yet. "
-            "Run scripts/check.sh, which waits for the setup deploy to finish."
+            "Run scripts/setup.sh, which waits for the deploy to finish."
         )
     return engine
 

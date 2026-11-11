@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-work for the lab. Run it once, at least 15 minutes before the session:
-# it ends by starting the first Agent Runtime deploy, which takes 5 to 10
-# minutes to build. Safe to rerun; rerunning also resets the data.
+# it waits for the first Agent Runtime deploy, which takes 5 to 10 minutes,
+# then warms up the code sandbox. Safe to rerun; rerunning also resets the data.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -95,8 +95,15 @@ echo "[5/5] Agent Runtime: the instance spending-insights, with its own Agent Id
 if [[ -n $(jq -r '.remote_agent_runtime_id // empty' deployment_metadata.json) ]]; then
   echo "  The agent is already deployed. Skipping the first deploy."
 else
-  agents-cli deploy --project="$P" --no-confirm-project --agent-identity --no-wait \
+  agents-cli deploy --project="$P" --no-confirm-project --agent-identity \
     --update-env-vars="TOOLBOX_URL=$TOOLBOX_CLOUD_URL"
+fi
+# Warmed here so module 2's first code run does not wait for it.
+if [[ ! -f .sandbox-warm ]]; then
+  echo "  Code sandbox: warming one up, about 2 minutes the first time in a project"
+  uv run python scripts/engine.py warm ||
+    { echo "Could not run code in an Agent Runtime sandbox. Rerun scripts/setup.sh." >&2; exit 1; }
+  touch .sandbox-warm
 fi
 
 cat <<'SUMMARY'
@@ -110,6 +117,5 @@ What setup created, and where the lab uses it:
   spending-insights          Agent Runtime instance with its own Agent Identity; module 2's
                              sandbox runs under it, module 4 deploys into it
 
-Setup started the deploy. It takes 5 to 10 minutes.
-Then run scripts/check.sh. It prints READY, or names what is missing.
+Setup is done. Run scripts/check.sh to confirm, then uv run adk web.
 SUMMARY

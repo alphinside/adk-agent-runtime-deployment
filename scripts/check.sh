@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # Checks that the lab is ready and names anything that is missing.
-#
-# Once the setup deploy finishes, the first run records it in 
-# deployment_metadata.json and warms up the code sandbox
+# Every run sends the deployed agent one short message.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -43,21 +41,8 @@ fi
 
 engine=$(jq -r '.remote_agent_runtime_id // empty' deployment_metadata.json)
 if [[ -z $engine ]]; then
-  # Finishes a deploy started with --no-wait, or says it is still running.
-  agents-cli deploy --status --project="$P" --no-confirm-project
-  engine=$(jq -r '.remote_agent_runtime_id // empty' deployment_metadata.json)
-fi
-if [[ -z $engine ]]; then
-  problems+=("The agent is not deployed yet. Wait a few minutes and run scripts/check.sh again.")
+  problems+=("The agent is not deployed. Run scripts/setup.sh.")
 else
-  if [[ ! -f .sandbox-warm ]]; then
-    echo "Warming up the code sandbox. The first one in a project takes about 2 minutes..."
-    if uv run python scripts/engine.py warm; then
-      touch .sandbox-warm
-    else
-      problems+=("Could not run code in an Agent Runtime sandbox under $engine.")
-    fi
-  fi
   url="https://$REGION-aiplatform.googleapis.com/reasoningEngines/v1/$engine/api"
   # The agent scales to zero, and the first request after that can time out.
   answered=

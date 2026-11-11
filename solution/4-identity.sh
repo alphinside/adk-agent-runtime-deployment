@@ -11,7 +11,7 @@ P=$GOOGLE_CLOUD_PROJECT
 TOOLBOX_URL=$(gcloud run services describe wallet-toolbox --project="$P" --region="$REGION" \
   --format='value(status.url)')
 # agents-cli resets the two content variables on every deploy, so pass all three each time.
-agents-cli deploy --project="$P" --no-confirm-project \
+agents-cli deploy --project="$P" --no-confirm-project --agent-identity \
   --update-env-vars="TOOLBOX_URL=$TOOLBOX_URL,OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental,ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=true,OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_AND_EVENT"
 
 PRINCIPAL=$(uv run python scripts/engine.py principal)

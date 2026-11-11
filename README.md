@@ -5,7 +5,7 @@ The starter project for the Deploy, Contain, Observe codelab. You work on a spen
 The agent here works, and it is deliberately open:
 
 - `UnsafeLocalCodeExecutor` runs the model's code on your machine, as you, with your files and your network.
-- The deployed agent has no identity of its own yet that can call MCP Toolbox, and it holds a project-wide `roles/aiplatform.user` it does not need.
+- The deployed agent runs as its own Agent Identity, but that identity cannot call MCP Toolbox yet, and it holds a project-wide `roles/aiplatform.user` it does not need.
 
 The codelab walks you through fixing both.
 
@@ -15,15 +15,15 @@ The codelab walks you through fixing both.
 
 ## Run it
 
-From Cloud Shell, in this folder, at least 15 minutes before you start the codelab:
+From Cloud Shell, in this folder, before you start the codelab:
 
 ```bash
 cp .env.example .env
 sed -i "s/your-project-id/$(gcloud config get-value project)/" .env # Set up .env with your project ID
-scripts/setup.sh            # APIs, data, MCP Toolbox, and the first deploy to Agent Runtime
+scripts/setup.sh            # APIs, data, MCP Toolbox, the agent on Agent Runtime, a warm code sandbox
 ```
 
-The first deploy takes 5 to 10 minutes. Then:
+`setup.sh` takes about 5 to 10 minutes, most of it the first deploy, and ends with a list of what it created. Then:
 
 ```bash
 scripts/check.sh            # Prints READY, or names what is missing
