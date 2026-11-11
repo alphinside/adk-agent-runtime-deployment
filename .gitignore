@@ -218,3 +218,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Lab starter
+.venv/
+.adk/
+bin/
+toolbox.log
+.toolbox.pid
+.sandbox-warm
+.google-agents-cli/
+deployment_metadata.json.lock
+*.png
+*.ttf

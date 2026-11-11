@@ -1,0 +1,52 @@
+kind: source
+name: wallet-bq
+type: bigquery
+project: ${GOOGLE_CLOUD_PROJECT}
+location: ${REGION}
+---
+kind: tool
+name: get_monthly_spending
+type: bigquery-sql
+source: wallet-bq
+description: >
+  Get one customer's spending in one month, totalled by category, largest
+  first.
+statement: |
+  SELECT category, SUM(amount) AS total, currency, COUNT(*) AS transactions
+  FROM wallet_insights.transactions
+  WHERE customer_id = @customer_id
+    AND FORMAT_DATE('%Y-%m', booked_on) = @month
+  GROUP BY category, currency
+  ORDER BY total DESC
+parameters:
+  - name: customer_id
+    type: string
+    description: Customer ID, such as cust_0001.
+  - name: month
+    type: string
+    description: The month as YYYY-MM, such as 2026-10.
+---
+kind: tool
+name: get_transactions
+type: bigquery-sql
+source: wallet-bq
+description: >
+  Get one customer's transactions between two dates, oldest first, at most
+  500 rows. Use it for charts and anything that needs single transactions.
+statement: |
+  SELECT txn_id, booked_on, merchant, category, amount, currency
+  FROM wallet_insights.transactions
+  WHERE customer_id = @customer_id
+    AND booked_on BETWEEN CAST(@start_date AS DATE) AND CAST(@end_date AS DATE)
+  ORDER BY booked_on, txn_id
+  LIMIT 500
+parameters:
+  - name: customer_id
+    type: string
+    description: Customer ID, such as cust_0001.
+  - name: start_date
+    type: string
+    description: First day to include, as YYYY-MM-DD.
+  - name: end_date
+    type: string
+    description: Last day to include, as YYYY-MM-DD.
