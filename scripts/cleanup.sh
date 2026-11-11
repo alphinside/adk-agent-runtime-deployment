@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Deletes what this lab created in your project. No other lab depends on it.
-# Safe to rerun: a step whose resource is already gone prints an error, and the
-# script carries on.
+# Deletes what this lab created in your project
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 set -a; source .env; set +a

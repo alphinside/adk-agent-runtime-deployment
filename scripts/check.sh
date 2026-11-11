@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # Checks that the lab is ready and names anything that is missing.
 #
-# Two things here change state on purpose. Once the setup deploy finishes, the
-# first run records it in deployment_metadata.json and warms up the code
-# sandbox, so the two-minute wait for the first sandbox happens now and not in
-# module 2. Every run also sends the deployed agent one short message.
+# Once the setup deploy finishes, the first run records it in 
+# deployment_metadata.json and warms up the code sandbox
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 

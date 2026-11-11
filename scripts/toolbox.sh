@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Runs MCP Toolbox in Cloud Shell, in the background, so one terminal is enough
-# for the lab. The agent uses it until it is deployed.
+# Runs MCP Toolbox in Cloud Shell, in the background
 #
 #   scripts/toolbox.sh start | restart | stop | status
 set -euo pipefail
