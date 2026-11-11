@@ -18,7 +18,7 @@ TOOLBOX_IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.12.0
 # A new service account can take a moment before IAM accepts it in a binding.
 retry() { for _ in 1 2 3 4 5 6; do "$@" && return; sleep 10; done; return 1; }
 
-echo "Checking Agents CLI..."
+echo "[1/5] Agents CLI: checking the version"
 echo "  $(command -v agents-cli || echo 'agents-cli: not found')"
 version=$(agents-cli --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
 if [[ $version != 1.12.* ]]; then
@@ -29,7 +29,8 @@ if [[ $version != 1.12.* ]]; then
 fi
 echo "  version $version"
 
-echo "Enabling APIs..."
+echo
+echo "[2/5] APIs: enabling the nine the lab uses"
 gcloud services enable \
   aiplatform.googleapis.com \
   bigquery.googleapis.com \
@@ -42,24 +43,27 @@ gcloud services enable \
   telemetry.googleapis.com \
   --project="$P"
 
-echo "Loading data into BigQuery..."
+echo
+echo "[3/5] Data: wallet_insights for the agent, wallet_risk that nothing may read"
 for dataset in wallet_insights wallet_risk; do
   bq --project_id="$P" mk --force --location="$REGION" --dataset "$dataset" >/dev/null
 done
 bq --project_id="$P" --location="$REGION" query --nouse_legacy_sql --quiet <data/seed.sql >/dev/null
 
-echo "Creating MCP Toolbox's service account..."
+echo
+echo "[4/5] MCP Toolbox: toolbox-sa, a private copy on Cloud Run, a local copy for modules 0 to 3"
+echo "  Service account toolbox-sa: runs BigQuery jobs, reads wallet_insights only"
 gcloud iam service-accounts describe "$TOOLBOX_SA" --project="$P" &>/dev/null ||
   gcloud iam service-accounts create toolbox-sa --project="$P" \
     --display-name="MCP Toolbox for the spending-insights lab" >/dev/null
 retry gcloud projects add-iam-policy-binding "$P" --member="serviceAccount:$TOOLBOX_SA" \
   --role=roles/bigquery.jobUser --condition=None --quiet >/dev/null
-# Read access on wallet_insights only. A DCL grant, because dataset-level
-# `bq add-iam-policy-binding` is not available in every project.
+# A DCL grant, because dataset-level `bq add-iam-policy-binding` is not
+# available in every project.
 retry bq --project_id="$P" --location="$REGION" query --nouse_legacy_sql --quiet \
   "GRANT \`roles/bigquery.dataViewer\` ON SCHEMA \`$P.wallet_insights\` TO \"serviceAccount:$TOOLBOX_SA\"" >/dev/null
 
-echo "Deploying MCP Toolbox to Cloud Run (private, runs as toolbox-sa)..."
+echo "  Cloud Run service $TOOLBOX_SERVICE: private, runs as toolbox-sa, for the deployed agent"
 # Cloud Run mounts tools.yaml from Secret Manager. Nothing in it is secret.
 if gcloud secrets describe "$TOOLBOX_SECRET" --project="$P" &>/dev/null; then
   gcloud secrets versions add "$TOOLBOX_SECRET" --project="$P" \
@@ -82,19 +86,30 @@ gcloud run deploy "$TOOLBOX_SERVICE" --project="$P" --region="$REGION" \
 TOOLBOX_CLOUD_URL=$(gcloud run services describe "$TOOLBOX_SERVICE" --project="$P" \
   --region="$REGION" --format='value(status.url)')
 
-echo "Installing Python dependencies..."
+echo "  Local copy on 127.0.0.1:5000, runs as you, for adk web in modules 0 to 3"
 uv sync --quiet
-
 scripts/toolbox.sh start
 
+echo
+echo "[5/5] Agent Runtime: the instance spending-insights, with its own Agent Identity"
 if [[ -n $(jq -r '.remote_agent_runtime_id // empty' deployment_metadata.json) ]]; then
-  echo "The agent is already deployed. Skipping the first deploy."
+  echo "  The agent is already deployed. Skipping the first deploy."
 else
-  echo "Starting the first deploy to Agent Runtime..."
   agents-cli deploy --project="$P" --no-confirm-project --agent-identity --no-wait \
     --update-env-vars="TOOLBOX_URL=$TOOLBOX_CLOUD_URL"
 fi
 
-echo
-echo "Setup started the deploy. It takes 5 to 10 minutes."
-echo "Then run scripts/check.sh. It prints READY, or names what is missing."
+cat <<'SUMMARY'
+
+What setup created, and where the lab uses it:
+  wallet_insights            the agent's data, read through MCP Toolbox in every module
+  wallet_risk                data nothing may read; module 4 checks that toolbox-sa can't
+  toolbox-sa                 MCP Toolbox's own identity, reads wallet_insights only
+  wallet-toolbox             private MCP Toolbox on Cloud Run; the agent calls it from module 4
+  Toolbox on 127.0.0.1:5000  runs as you, for adk web in modules 0 to 3
+  spending-insights          Agent Runtime instance with its own Agent Identity; module 2's
+                             sandbox runs under it, module 4 deploys into it
+
+Setup started the deploy. It takes 5 to 10 minutes.
+Then run scripts/check.sh. It prints READY, or names what is missing.
+SUMMARY
