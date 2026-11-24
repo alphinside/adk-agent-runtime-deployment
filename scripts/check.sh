@@ -12,9 +12,11 @@ set -a; source .env; set +a
 P=$GOOGLE_CLOUD_PROJECT
 problems=()
 
-version=$(agents-cli --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
-[[ $version == 1.12.* ]] ||
-  problems+=("agents-cli resolves to '${version:-nothing}' at $(command -v agents-cli), not 1.12.x. Run: uv tool uninstall google-agents-cli && hash -r")
+version=$(agents-cli --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)
+IFS=. read -r major minor _ <<< "${version:-0.0.0}"
+if [[ "$((10#${major:-0}))" -ne 1 || "$((10#${minor:-0}))" -lt 12 ]]; then
+  problems+=("agents-cli resolves to '${version:-nothing}' at $(command -v agents-cli 2>/dev/null || echo 'not found'), need >= 1.12.0 (< 2.0.0). Run: uv tool install --upgrade google-agents-cli && uv tool update-shell && export PATH=\"\$HOME/.local/bin:\$PATH\"")
+fi
 
 enabled=$(gcloud services list --enabled --project="$P" --format='value(config.name)' 2>/dev/null)
 for api in aiplatform bigquery cloudresourcemanager cloudtrace iam logging run secretmanager telemetry; do
