@@ -15,8 +15,24 @@ TOOLBOX_SERVICE=wallet-toolbox
 TOOLBOX_SECRET=wallet-toolbox-tools
 TOOLBOX_IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.12.0
 
-# A new service account can take a moment before IAM accepts it in a binding.
-retry() { for _ in 1 2 3 4 5 6; do "$@" && return; sleep 10; done; return 1; }
+# A new service account, secret, or Cloud Run service agent can take a moment
+# before IAM or Cloud Run accepts it.
+retry() {
+  local attempt=1
+  local err=""
+  while true; do
+    if err=$("$@" 2>&1); then
+      return 0
+    fi
+    if (( attempt > 5 )); then
+      echo "${err}" >&2
+      return 1
+    fi
+    echo "  Waiting for IAM propagation (retry ${attempt}/5 in 10s)..." >&2
+    sleep 10
+    ((attempt++))
+  done
+}
 
 echo "[1/5] Agents CLI: checking the version"
 version=$(agents-cli --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)
@@ -53,29 +69,39 @@ bq --project_id="$P" --location="$REGION" query --nouse_legacy_sql --quiet <data
 echo
 echo "[4/5] MCP Toolbox: toolbox-sa, a private copy on Cloud Run, a local copy for modules 0 to 3"
 echo "  Service account toolbox-sa: runs BigQuery jobs, reads wallet_insights only"
-gcloud iam service-accounts describe "$TOOLBOX_SA" --project="$P" &>/dev/null ||
+if ! gcloud iam service-accounts describe "$TOOLBOX_SA" --project="$P" &>/dev/null; then
   gcloud iam service-accounts create toolbox-sa --project="$P" \
     --display-name="MCP Toolbox for the spending-insights lab" >/dev/null
+  sleep 5
+fi
 retry gcloud projects add-iam-policy-binding "$P" --member="serviceAccount:$TOOLBOX_SA" \
-  --role=roles/bigquery.jobUser --condition=None --quiet >/dev/null
+  --role=roles/bigquery.jobUser --condition=None --quiet
 # A DCL grant, because dataset-level `bq add-iam-policy-binding` is not
 # available in every project.
 retry bq --project_id="$P" --location="$REGION" query --nouse_legacy_sql --quiet \
-  "GRANT \`roles/bigquery.dataViewer\` ON SCHEMA \`$P.wallet_insights\` TO \"serviceAccount:$TOOLBOX_SA\"" >/dev/null
+  "GRANT \`roles/bigquery.dataViewer\` ON SCHEMA \`$P.wallet_insights\` TO \"serviceAccount:$TOOLBOX_SA\""
 
 echo "  Cloud Run service $TOOLBOX_SERVICE: private, runs as toolbox-sa, for the deployed agent"
 # Cloud Run mounts tools.yaml from Secret Manager. Nothing in it is secret.
+created_secret=0
 if gcloud secrets describe "$TOOLBOX_SECRET" --project="$P" &>/dev/null; then
   gcloud secrets versions add "$TOOLBOX_SECRET" --project="$P" \
     --data-file=mcp-toolbox/tools.yaml >/dev/null
 else
   gcloud secrets create "$TOOLBOX_SECRET" --project="$P" \
     --replication-policy=automatic --data-file=mcp-toolbox/tools.yaml >/dev/null
+  created_secret=1
 fi
 retry gcloud secrets add-iam-policy-binding "$TOOLBOX_SECRET" --project="$P" \
   --member="serviceAccount:$TOOLBOX_SA" --role=roles/secretmanager.secretAccessor \
-  --condition=None --quiet >/dev/null
-gcloud run deploy "$TOOLBOX_SERVICE" --project="$P" --region="$REGION" \
+  --condition=None --quiet
+# Newly created secrets, service accounts, and Cloud Run service agents can
+# take a few seconds before Cloud Run's secret preflight sees IAM propagation.
+if [[ "$created_secret" -eq 1 ]]; then
+  sleep 5
+fi
+echo "  Deploying $TOOLBOX_SERVICE on Cloud Run (1 to 3 minutes)..."
+retry gcloud run deploy "$TOOLBOX_SERVICE" --project="$P" --region="$REGION" \
   --image="$TOOLBOX_IMAGE" \
   --service-account="$TOOLBOX_SA" \
   --no-allow-unauthenticated \
