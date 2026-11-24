@@ -19,15 +19,15 @@ TOOLBOX_IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.12.0
 retry() { for _ in 1 2 3 4 5 6; do "$@" && return; sleep 10; done; return 1; }
 
 echo "[1/5] Agents CLI: checking the version"
-echo "  $(command -v agents-cli || echo 'agents-cli: not found')"
-version=$(agents-cli --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
-if [[ $version != 1.12.* ]]; then
-  echo "This lab needs Agents CLI 1.12.x; this shell runs '${version:-none}'." >&2
-  echo "Cloud Shell ships 1.12.0, but an older copy in ~/.local/bin comes first on PATH. Remove it with:" >&2
-  echo "  uv tool uninstall google-agents-cli && hash -r" >&2
+version=$(agents-cli --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)
+IFS=. read -r major minor _ <<< "${version:-0.0.0}"
+if [[ "$((10#${major:-0}))" -ne 1 || "$((10#${minor:-0}))" -lt 12 ]]; then
+  echo "This repo needs Agents CLI >= 1.12.0 (< 2.0.0); this shell runs '${version:-none}'." >&2
+  echo "Install or upgrade it with:" >&2
+  echo '  uv tool install --upgrade google-agents-cli && uv tool update-shell && export PATH="$HOME/.local/bin:$PATH"' >&2
   exit 1
 fi
-echo "  version $version"
+echo "  agents-cli ${version} (ignore any 'scaffold upgrade' notice during deploy)"
 
 echo
 echo "[2/5] APIs: enabling the nine the lab uses"
