@@ -80,7 +80,7 @@ root_agent = Agent(
     # Keep in sync with create_params.root_agent_name in agents-cli-manifest.yaml.
     name="spending_agent",
     model=Gemini(
-        model="gemini-3.8-flash",
+        model="gemini-3.5-flash-lite",
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
     instruction=INSTRUCTION,
